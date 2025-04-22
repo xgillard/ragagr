@@ -1,0 +1,6 @@
+.venv
+digita
+**/__pycache__
+**/.ipynb_checkpoints
+sent.zip
+sent
