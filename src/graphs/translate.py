@@ -4,7 +4,7 @@ from typing import TypedDict
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers.string import StrOutputParser
-from langgraph.graph import StateGraph
+from langgraph.graph import END, START, StateGraph
 
 from ..resources import CHAT  # noqa: TID252
 
@@ -39,12 +39,5 @@ def translate_to(state: TranslateState) -> dict[str, str]:
     return {"translated": translated}
 
 
-# build the graph
-_builder = StateGraph(TranslateState)
-_builder.add_node("translate", translate_to)
-
-_builder.set_entry_point("translate")
-_builder.set_finish_point("translate")
-
-TRANSLATE_GRAPH = _builder.compile()
+TRANSLATE_GRAPH = translate_to
 """The actual translation graph that you can use"""

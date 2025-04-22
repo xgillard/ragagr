@@ -5,7 +5,7 @@ from typing import Annotated, TypedDict
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers.string import StrOutputParser
-from langgraph.graph import StateGraph
+from langgraph.graph import END, START, StateGraph
 
 from ..resources import CHAT  # noqa: TID252
 
@@ -35,19 +35,14 @@ _SYNTHEZIZE = ChatPromptTemplate.from_template("""
     """)
 
 
-def synthezize(state: SynthezizeState) -> dict[str, str]:
+def synthesize(state: SynthezizeState) -> dict[str, str]:
     """Write a synthesis of the proposed items."""
     original = state["translated"]
     partials = "\n\n".join(state["partial"])
     prompt   = _SYNTHEZIZE.invoke({"original": original, "partials": partials})
     response = (CHAT | StrOutputParser()).invoke(prompt)
-    return {"sythesis": response}
+    return {"synthesis": response}
 
 
-_builder = StateGraph(SynthezizeState)
-_builder.add_node("synthezize", synthezize)
-_builder.set_entry_point("synthezize")
-_builder.set_finish_point("synthezize")
-
-SYNTHESIZE_GRAPH = _builder.compile()
+SYNTHESIZE_GRAPH = synthesize
 """The actual synthezize graph that you can use"""
