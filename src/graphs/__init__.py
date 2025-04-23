@@ -86,7 +86,8 @@ __SORTING_PROMPT = ChatPromptTemplate.from_template("""
     {translated}
 """)
 
-def route_to_specialist(state: State) -> dict[str, Literal["search_genealogy", "done"]]:
+__Expert = Literal["getting_started_genealogy", "user_guide_genealogy", "user_guide_records"]
+def route_to_specialist(state: State) -> __Expert:
     """Route the message to a specialist agent."""
     prompt  = __SORTING_PROMPT.invoke(state)
     route   =  (CHAT | StrOutputParser()).invoke(prompt)
@@ -107,6 +108,7 @@ that placeholder using the actual url:
 * Records, User Guide: https://agatha.arch.be/help/States-Archives_user-guide-analyses-records.pdf
 * Records, Search Engine: https://agatha.arch.be/search/analyses/
 * Inventories, Search Engine: https://agatha.arch.be/search/ead/
+* Contact form: https://agatha.arch.be/contact/
 
 # Response from your colleague
 {synthesis}
@@ -126,7 +128,6 @@ _builder.add_node("to_user_language",    to_user_language)
 _builder.add_node("translate_usr",       TRANSLATE_GRAPH)
 _builder.add_node("faq",                 FAQ_GRAPH)
 _builder.add_node("synthesize",          SYNTHESIZE_GRAPH)
-_builder.add_node("route_to_specialist", route_to_specialist)
 
 _builder.add_node("getting_started_genealogy",  GENEALOGY_GRAPH)
 _builder.add_node("user_guide_genealogy",       lambda x: {"synthesis": f"{x['synthesis']}\n+++USR GUIDE G+++"})
@@ -135,20 +136,20 @@ _builder.add_node("user_guide_records",         lambda x: {"synthesis": f"{x['sy
 _builder.add_node("fix_links",         fix_links)
 _builder.add_node("reply_to_user",     reply_to_user)
 
-_builder.add_edge(START,                      "detect_language")
-_builder.add_edge(START,                      "to_english")
-_builder.add_edge("to_english",               "translate_eng")
-_builder.add_edge("translate_eng",            "faq")
-_builder.add_edge(["faq", "detect_language"], "synthesize")
-_builder.add_conditional_edges("synthesize",   route_to_specialist)
+_builder.add_edge(START,                             "detect_language")
+_builder.add_edge(START,                             "to_english")
+_builder.add_edge("to_english",                      "translate_eng")
+_builder.add_edge("translate_eng",                   "faq")
+_builder.add_edge("faq",                             "synthesize")
+_builder.add_conditional_edges("synthesize",         route_to_specialist)
 
-_builder.add_edge("getting_started_genealogy", "fix_links")
-_builder.add_edge("user_guide_genealogy",      "fix_links")
-_builder.add_edge("user_guide_records",        "fix_links")
+_builder.add_edge("getting_started_genealogy",       "fix_links")
+_builder.add_edge("user_guide_genealogy",            "fix_links")
+_builder.add_edge("user_guide_records",              "fix_links")
 
-_builder.add_edge("fix_links",                 "to_user_language")
-_builder.add_edge("to_user_language",          "translate_usr")
-_builder.add_edge("translate_usr",             "reply_to_user")
-_builder.add_edge("reply_to_user",             END)
+_builder.add_edge(["detect_language", "fix_links"], "to_user_language")
+_builder.add_edge("to_user_language",                "translate_usr")
+_builder.add_edge("translate_usr",                   "reply_to_user")
+_builder.add_edge("reply_to_user",                   END)
 
 ARKEY_GRAPH = _builder.compile()
