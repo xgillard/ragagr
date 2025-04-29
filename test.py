@@ -9,17 +9,27 @@ from arkey import arkey
 
 async def parkey(x: str) -> None:
     """Effectue un tour dans le graphe de digita et en imprime la réponse."""
-    async with AsyncSqliteSaver.from_conn_string("./arkeystate.db") as db:
-        config = {"configurable": {"thread_id": str(uuid4()) }}
-        rsp = await arkey(db).ainvoke({"original": x}, config)
-        print(rsp["response"])  # noqa: T201
+    #async with AsyncSqliteSaver.from_conn_string("./arkeystate.db") as db:
+    #    config = {"configurable": {"thread_id": str(uuid4()) }}
+    rsp = await arkey().ainvoke({"original": x})
+    print(rsp["response"])  # noqa: T201
 
 async def sarkey(x: str) -> None:
     """Effectue un tour dans le graphe de digita et en imprime la réponse."""
     async with AsyncSqliteSaver.from_conn_string("./arkeystate.db") as db:
         config = {"configurable": {"thread_id": str(uuid4()) }}
         async for c in arkey(db).astream({"original": x}, config):
-            print(c)  # noqa: T201
+            mapping = next(iter(c.values()))
+            if "language" in mapping:
+                print(mapping["language"])
+            if "questions" in mapping:
+                print(mapping["questions"])
+            if "partial" in mapping:
+                print(mapping["partial"])
+            if "en_response" in mapping:
+                print(mapping["en_response"])
+            if "response" in mapping:
+                print(mapping["response"])
 
 
 async def main() -> None:

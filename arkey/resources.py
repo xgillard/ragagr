@@ -10,7 +10,8 @@ __DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 __DIGITA = "/home/xgillard/REPO/rag/agr/notebooks/digita"
 
 # The chat model used for the 'smart' interactions
-CHAT = ChatOllama(base_url="http://localhost:11434", model="gemma3:1b", temperature=0.0)
+CHAT  = ChatOllama(base_url="http://localhost:11434", model="gemma3:4b", temperature=0.1, verbose=True)
+THINK = ChatOllama(base_url="http://localhost:11434", model="deepseek-r1:8b", temperature=0.1, verbose=True)
 
 # The FAQ database
 FAQ = Chroma(

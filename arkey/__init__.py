@@ -66,6 +66,7 @@ async def split(state: ArkeyState) -> dict[str, list[str]|int ]:
     """Split the user's request."""
     questions = await split_user_request.ainvoke(state["english"])
     return {"questions": questions.questions, "qid": 0}
+    #return {"questions": [state["english"]], "qid": 0}
 
 async def route(state: ArkeyState) -> Literal["faq", "genealogy", "records", "synthesis"]:
     """Route the question towards the most appropriate flow."""
@@ -87,7 +88,7 @@ async def faq(state: ArkeyState) -> dict[str, str]:
     """Search in the faq."""
     qid = state["qid"]
     question = state["questions"][qid]
-    retriever= FAQ.as_retriever(search_type="mmr")
+    retriever= FAQ.as_retriever(search_type="mmr", search_kwargs={"k": 5, "fetch_k": 10})
     prompt = FIND_SIMILAR.format(input=question)
     sources = await retriever.ainvoke(prompt)
     sources = [e.metadata["fulltext"] for e in sources ]
@@ -99,7 +100,7 @@ async def genealogy(state: ArkeyState) -> dict[str, str]:
     """Search in the genealogic sources."""
     qid = state["qid"]
     question = state["questions"][qid]
-    retriever= GENEALOGY.as_retriever(search_type="mmr")
+    retriever= GENEALOGY.as_retriever(search_type="mmr", search_kwargs={"k": 5, "fetch_k": 10})
     prompt = FIND_RELEVANT.format(input=question)
     sources = await retriever.ainvoke(prompt)
     sources = [e.page_content for e in sources ]
@@ -111,7 +112,7 @@ async def records(state: ArkeyState) -> dict[str, str]:
     """Search in the records analysis sources."""
     qid = state["qid"]
     question = state["questions"][qid]
-    retriever= RECORDS.as_retriever(search_type="mmr")
+    retriever= RECORDS.as_retriever(search_type="mmr", search_kwargs={"k": 5, "fetch_k": 10})
     prompt = FIND_RELEVANT.format(input=question)
     sources = await retriever.ainvoke(prompt)
     sources = [e.page_content for e in sources ]
@@ -122,8 +123,10 @@ async def records(state: ArkeyState) -> dict[str, str]:
 async def synthesis(state: ArkeyState) -> dict[str, str]:
     """Synthesize the partial responses made along the various flows."""
     partials = state["partial"]
-    partials = "\n\n".join(partials)
-    response = await synthesize.ainvoke({"original": state["english"], "partials": partials})
+    questions= state["questions"]
+    knowledge= (f"## {q}\n{r}" for (q, r) in zip(questions, partials))
+    knowledge= "\n\n".join(knowledge)
+    response = await synthesize.ainvoke({"original": state["english"], "partials": knowledge})
     return {"en_response": response}
 
 async def to_user_language(state: ArkeyState) -> dict[str, str]:
