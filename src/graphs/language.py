@@ -4,6 +4,7 @@ from typing import TypedDict
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers.string import StrOutputParser
+from langchain_core.runnables import RunnableLambda
 
 from ..resources import CHAT  # noqa: TID252
 
@@ -31,5 +32,5 @@ def find_language(state: LanguageState) -> dict[str, str]:
     return {"language": language}
 
 
-LANGUAGE_GRAPH = find_language
+LANGUAGE_GRAPH = RunnableLambda(find_language)
 """The actual language graph that you can use."""

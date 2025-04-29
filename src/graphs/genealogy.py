@@ -6,7 +6,7 @@ from typing import Annotated, TypedDict
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 
 from ..resources import CHAT, GENEALOGY  # noqa: TID252
 
@@ -14,21 +14,21 @@ from ..resources import CHAT, GENEALOGY  # noqa: TID252
 class GenealogyState(TypedDict):
     """Tracks the step in the genealogy search."""
 
-    translated: str
+    english: str
     """Translation of the user's question in English."""
     sources: list[str]
     """The list of sources used to answer the user's queston."""
     partial: Annotated[list[str], add]
     """The set of partial attempts at answering the user's question."""
-    synthesis: str
-    """The synthesis of all partial responses;"""
+    response: str
+    """The synthesis of all partial responses"""
 
 def search_genealogy(state: GenealogyState) -> dict[str, list[str]]:
     """Search in the getting started with genealogy information."""
     genea = GENEALOGY.as_retriever(search_type="mmr")
     prompt= f"""
     Instruct: Retrieve the passages most relevant to answer the user's email.
-    User's Email: {state['translated']}""".strip()
+    User's Email: {state['english']}""".strip()
     results = [d.page_content for d in genea.get_relevant_documents(prompt) ]
     return {"sources": results}
 
@@ -50,22 +50,22 @@ __RESPOND_PROMPT = ChatPromptTemplate.from_template("""
     {sources}
 
     # Customer Email:
-    {translated}
+    {english}
 
     # Tentative reply based on the FAQ only
-    {tentative}
+    {response}
 """)
 def respond(state: GenealogyState) -> dict[str, list[str] | int]:
     """Respond to the current question using the Genealogy getting started."""
     sources  = state["sources"]
     sources  = "\n\n".join(sources)
     prompt   = __RESPOND_PROMPT.invoke({
-        "sources":    sources,
-        "translated": state["translated"],
-        "tentative":  state["synthesis"],
+        "sources": sources,
+        "english": state["english"],
+        "response":  state["response"],
     })
     response = (CHAT | StrOutputParser()).invoke(prompt)
-    return {"synthesis": response}
+    return {"response": response}
 
 
 _builder = StateGraph(GenealogyState, input=GenealogyState, output=GenealogyState)

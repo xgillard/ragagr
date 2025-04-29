@@ -7,7 +7,7 @@ from typing import Annotated, Literal, TypedDict
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers.json import JsonOutputParser
 from langchain_core.output_parsers.string import StrOutputParser
-from langgraph.graph import StateGraph
+from langgraph.graph import END, StateGraph
 
 from ..resources import CHAT, FAQ  # noqa: TID252
 
@@ -15,7 +15,7 @@ from ..resources import CHAT, FAQ  # noqa: TID252
 class FaqState(TypedDict):
     """Tracks the state of every steps in the FAQ process."""
 
-    translated: str
+    english: str
     """Translation of the user's question in English."""
     questions: list[str]
     """The list of normalized questions in the user's query."""
@@ -25,20 +25,22 @@ class FaqState(TypedDict):
     """The list of sources used to answer the user's queston."""
     partial: Annotated[list[str], add]
     """The set of partial attempts at answering the user's question."""
+    response: str
+    """The response that was given by the FAQ expert."""
 
 
 class FaqInput(TypedDict):
     """Input of the FAQ graph."""
 
-    translated: str
+    english: str
     """Translation of the user's qustion in English."""
 
 
 class FaqOutput(TypedDict):
     """Output of the FAQ graph."""
 
-    partial: Annotated[list[str], add]
-    """The set of partial attempts at answering the user's question."""
+    response: str
+    """The response that was given by the FAQ expert."""
 
 
 # The template used to normalize the user's question.
@@ -83,7 +85,7 @@ _RESPOND = ChatPromptTemplate.from_messages([
 
 def normalize(state: FaqState) -> dict[str, str|int]:
     """Reoformulate the user input as a list of questions."""
-    questions = ( _NORMALIZE | CHAT | JsonOutputParser() ) .invoke({"input": state["translated"]})
+    questions = ( _NORMALIZE | CHAT | JsonOutputParser() ) .invoke({"input": state["english"]})
     return {"questions": questions, "qid": 0}
 
 def search(state: FaqState) -> dict[str, list[str]]:
@@ -111,27 +113,48 @@ def respond(state: FaqState) -> dict[str, list[str] | int]:
     response = (CHAT | StrOutputParser()).invoke(prompt)
     return {"partial": [response], "qid": qid+1}
 
-def finish(state: FaqState) -> FaqState:
-    """Do nothing."""
-    return state
 
-def finish_or_continue(state: FaqState) -> Literal["search", "finish"] :
+_SYNTHEZIZE = ChatPromptTemplate.from_template("""
+    You are a support email assistant who synthezizes the inputs from colleagues and use these inputs to
+    write an email answering the user's request. Always be polite, professional and use a neutral tone.
+    Be accurate, do not invent facts that are not backed by the inputs from your colleagues.
+    When you cannot satisfy a user's request, just say so.
+    At the end of your email, sign as 'Arkey'.
+
+    # User's request
+    {original}
+
+    # Input from your colleagues
+    {partials}
+    """)
+
+
+def synthesize(state: FaqState) -> dict[str, str]:
+    """Write a synthesis of the proposed items."""
+    original = state["english"]
+    partials = "\n\n".join(state["partial"])
+    prompt   = _SYNTHEZIZE.invoke({"original": original, "partials": partials})
+    response = (CHAT | StrOutputParser()).invoke(prompt)
+    return {"response": response}
+
+
+def finish_or_continue(state: FaqState) -> Literal["search", "synthesize"] :
     """Decide whether a next question should be processed."""
     qid = state["qid"]
     qs  = state["questions"]
-    return "search" if qid < len(qs) else "finish"
+    return "search" if qid < len(qs) else "synthesize"
 
 _builder = StateGraph(FaqState, input=FaqInput, output=FaqOutput)
 _builder.add_node("normalize",      normalize)
 _builder.add_node("search",         search)
 _builder.add_node("respond",        respond)
-_builder.add_node("finish",         finish)
+_builder.add_node("synthesize",     synthesize)
 
 _builder.set_entry_point("normalize")
 _builder.add_edge("normalize",     "search")
 _builder.add_edge("search",        "respond")
 _builder.add_conditional_edges("respond", finish_or_continue)
-_builder.set_finish_point("finish")
+_builder.add_edge("synthesize", END)
 
 FAQ_GRAPH = _builder.compile()
 """The actual faq graph that you can use"""
