@@ -1,24 +1,32 @@
 """Un cas d'exmple pour valider le pipeline."""
 
+from uuid import uuid4
+
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
 from arkey import arkey
 
 
 async def parkey(x: str) -> None:
     """Effectue un tour dans le graphe de digita et en imprime la réponse."""
-    rsp = await arkey.ainvoke({"original": x})
-    print(rsp["response"])  # noqa: T201
+    async with AsyncSqliteSaver.from_conn_string("./arkeystate.db") as db:
+        config = {"configurable": {"thread_id": str(uuid4()) }}
+        rsp = await arkey(db).ainvoke({"original": x}, config)
+        print(rsp["response"])  # noqa: T201
 
 async def sarkey(x: str) -> None:
     """Effectue un tour dans le graphe de digita et en imprime la réponse."""
-    async for c in arkey.astream({"original": x}):
-        print(c)  # noqa: T201
+    async with AsyncSqliteSaver.from_conn_string("./arkeystate.db") as db:
+        config = {"configurable": {"thread_id": str(uuid4()) }}
+        async for c in arkey(db).astream({"original": x}, config):
+            print(c)  # noqa: T201
 
 
 async def main() -> None:
     """Run the main entry point of the program."""
-    await parkey("""S'agit-il de Marneffe Joseph né en 1829 à Namur?
+    await sarkey("""S'agit-il de Marneffe Joseph né en 1829 à Namur?
     A-t-il été emprisonné et si oui combien de temps? Merci pour votre réponse""")
-    print("==" * 120)  # noqa: T201
+    print("==" * 80)  # noqa: T201
     #await parkey("""
     #Bonjour et Meilleurs Voeux
     #Je recherche dans vos archives numérisés de Bruxelles, l'acte de mariage 2117 du 30/11/1901
@@ -37,7 +45,7 @@ async def main() -> None:
     #Merci
     #""")
     #print("==" * 120)  # noqa: T201
-    #parkey("""
+    #await parkey("""
     #JE vous remerci mesieux je suis ravie de vous conetresurprise pour moi que jentent que vous etes lire
     #mon sutuation malque mon pere etait orphelin de -un anciens combattants et victimes de uerremoi 
     #je suis son filsque il a un pension en 1943 OU LE RECUE EN 1948 JARIVE PAS DE COMPRENDRE LARCHIVES 

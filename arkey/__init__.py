@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from operator import add
-from typing import Annotated, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -23,6 +23,10 @@ from .resources import (
     GENEALOGY,
     RECORDS,
 )
+
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+    from langgraph.graph.graph import CompiledGraph
 
 
 class ArkeyState(TypedDict):
@@ -129,25 +133,26 @@ async def to_user_language(state: ArkeyState) -> dict[str, str]:
     trans = await translate.ainvoke({"input": text, "target": target})
     return {"response": trans}
 
+def arkey(checkpointer: BaseCheckpointSaver = None) -> CompiledGraph:
+    """Create a workflow for the arkeybot."""
+    _builder = StateGraph(ArkeyState)
+    _builder.add_node("determine_language", determine_language)
+    _builder.add_node("to_english", to_english)
+    _builder.add_node("split", split)
+    _builder.add_node("faq", faq)
+    _builder.add_node("genealogy", genealogy)
+    _builder.add_node("records", records)
+    _builder.add_node("synthesis", synthesis)
+    _builder.add_node("to_user_language", to_user_language)
 
-_builder = StateGraph(ArkeyState)
-_builder.add_node("determine_language", determine_language)
-_builder.add_node("to_english", to_english)
-_builder.add_node("split", split)
-_builder.add_node("faq", faq)
-_builder.add_node("genealogy", genealogy)
-_builder.add_node("records", records)
-_builder.add_node("synthesis", synthesis)
-_builder.add_node("to_user_language", to_user_language)
+    _builder.add_edge(START, "determine_language")
+    _builder.add_edge(START, "to_english")
+    _builder.add_edge("to_english", "split")
+    _builder.add_conditional_edges("split", route)
+    _builder.add_conditional_edges("faq", route)
+    _builder.add_conditional_edges("genealogy", route)
+    _builder.add_conditional_edges("records", route)
+    _builder.add_edge(["determine_language", "synthesis"], "to_user_language")
+    _builder.add_edge("to_user_language", END)
 
-_builder.add_edge(START, "determine_language")
-_builder.add_edge(START, "to_english")
-_builder.add_edge("to_english", "split")
-_builder.add_conditional_edges("split", route)
-_builder.add_conditional_edges("faq", route)
-_builder.add_conditional_edges("genealogy", route)
-_builder.add_conditional_edges("records", route)
-_builder.add_edge(["determine_language", "synthesis"], "to_user_language")
-_builder.add_edge("to_user_language", END)
-
-arkey = _builder.compile()
+    return _builder.compile(checkpointer)
